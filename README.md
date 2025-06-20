@@ -5,7 +5,7 @@ This project is a voice-enabled chatbot using LiveKit, Python, and a Next.js fro
 ## Prerequisites
 
 - [LiveKit Server](https://docs.livekit.io/)
-- Python 3.8+
+- Python 3.12
 - Node.js & [pnpm](https://pnpm.io/)
 
 ## Setup
@@ -53,16 +53,10 @@ Create a `.env` file in your project root with the following (replace with your 
 
 ```env
 DEEPGRAM_API_KEY="your_deepgram_api_key"
-ELEVENLABS_API_KEY="your_elevenlabs_api_key"
 OPENAI_API_KEY="your_openai_api_key"
-AWS_ACCESS_KEY_ID="your_aws_access_key_id"
-AWS_SECRET_ACCESS_KEY="your_aws_secret_access_key"
-AWS_DEFAULT_REGION="your_aws_region"
 LIVEKIT_API_KEY="your_livekit_api_key"
 LIVEKIT_API_SECRET="your_livekit_api_secret"
 LIVEKIT_URL="ws://localhost:7880"
-AZURE_SPEECH_KEY="your_azure_speech_key"
-AZURE_SPEECH_REGION="your_azure_speech_region"
 ```
 
 **Never commit your `.env` file or API keys to version control.**

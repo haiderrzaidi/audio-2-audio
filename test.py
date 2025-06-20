@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 from livekit.agents import JobContext, WorkerOptions, cli
 from livekit.agents.voice import Agent, AgentSession
-from livekit.plugins import deepgram, openai, silero, azure
+from livekit.plugins import deepgram, openai, silero, azure, elevenlabs
 
 # Load .env variables
 load_dotenv(override=True)
@@ -14,7 +14,7 @@ class UninterruptableAgent(Agent):
             instructions="You are a savage friendly AI. You are a friend who is always there to have a fun conversation and talk about anything. You have a bit attitude or shoud i say sass to you. You reply precisely. You never yap about anything always straight to the point and funny.",
             stt=deepgram.STT(api_key=os.getenv("DEEPGRAM_API_KEY")),
             llm=openai.LLM(api_key=os.getenv("OPENAI_API_KEY"), model="gpt-4o"),
-            tts=openai.TTS(api_key=os.getenv("OPENAI_API_KEY")),
+            # tts=openai.TTS(api_key=os.getenv("OPENAI_API_KEY")),
             # We leave vad unset here—session will provide it
         )
 
@@ -30,6 +30,11 @@ async def entrypoint(ctx: JobContext):
     vad = silero.VAD.load()
 
     session = AgentSession(
+        tts=elevenlabs.TTS(
+            api_key=os.getenv("ELEVENLABS_API_KEY"),
+            voice_id="ODq5zmih8GrVes37Dizd",
+            model="eleven_multilingual_v2"
+        ),        
     # tts=azure.TTS(
     #     speech_key=os.getenv("AZURE_SPEECH_KEY"),
     #     speech_region=os.getenv("AZURE_SPEECH_REGION"),
