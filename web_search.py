@@ -5,7 +5,7 @@ from livekit.agents import JobContext, WorkerOptions, cli
 from livekit.agents.voice import Agent, AgentSession
 from livekit.plugins import deepgram, openai, silero, azure, elevenlabs
 
-# Load .env variables
+
 load_dotenv(override=True)
 
 class WebSearchAgent(Agent):
@@ -24,7 +24,7 @@ class WebSearchAgent(Agent):
         )
     
     async def on_enter(self):
-        # Initial greeting
+
         await self.session.generate_reply(
             user_input="Hello! I'm your AI assistant with web search capabilities. Ask me anything!"
         )
@@ -91,7 +91,7 @@ class WebSearchAgent(Agent):
             
 
             if citations:
-                response_content += f"\n\nSources: {', '.join(citations[:2])}"  # Limit to 2 sources for brevity
+                response_content += f"\n\nSources: {', '.join(citations[:2])}" 
             
             return response_content.replace("*","")
             
@@ -125,7 +125,7 @@ async def entrypoint(ctx: JobContext):
             voice="en-GB-OllieMultilingualNeural"
         ),
         vad=vad,
-        # Note: no turn_detection specified => defaults to VAD only
+
     )
 
     await session.start(
