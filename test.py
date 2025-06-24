@@ -2,8 +2,8 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 from livekit.agents import JobContext, WorkerOptions, cli
-from livekit.agents.voice import Agent, AgentSession
-from livekit.plugins import deepgram, openai, silero, azure, elevenlabs
+from livekit.agents.voice import Agent, AgentSession#,RoomInputOptions
+from livekit.plugins import deepgram, openai, silero, azure, elevenlabs,noise_cancellation
 
 # Load .env variables
 load_dotenv(override=True)
@@ -47,6 +47,9 @@ async def entrypoint(ctx: JobContext):
     await session.start(
         agent=UninterruptableAgent(),
         room=ctx.room
+        # room_input_options=RoomInputOptions(
+        #     noise_cancellation=noise_cancellation.BVC(),
+    # ),        
     )
 
 if __name__ == "__main__":
