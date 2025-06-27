@@ -1,14 +1,14 @@
-import { Public_Sans } from 'next/font/google';
 import localFont from 'next/font/local';
 import { headers } from 'next/headers';
 import { ApplyThemeScript, ThemeToggle } from '@/components/theme-toggle';
 import { getAppConfig, getOrigin } from '@/lib/utils';
 import './globals.css';
 
-const publicSans = Public_Sans({
+// Use system fonts instead of Google Fonts
+const systemFont = {
   variable: '--font-public-sans',
-  subsets: ['latin'],
-});
+  className: 'font-sans', // This will use Tailwind's default sans-serif stack
+};
 
 const commitMono = localFont({
   src: [
@@ -61,7 +61,7 @@ export default async function RootLayout({ children }: RootLayoutProps) {
         <ApplyThemeScript />
       </head>
       <body
-        className={`${publicSans.variable} ${commitMono.variable} overflow-x-hidden antialiased`}
+        className={`${systemFont.variable} ${commitMono.variable} overflow-x-hidden antialiased font-sans`}
       >
         {children}
         <div className="group fixed bottom-0 left-1/2 z-50 mb-2 -translate-x-1/2">

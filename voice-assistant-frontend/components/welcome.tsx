@@ -23,7 +23,7 @@ export const Welcome = ({
       <h1 className="font-bold">OLI YOUR BEST BUD</h1>
 
       <p className="text-muted-foreground max-w-prose pt-1 font-mono text-lg">
-        Let's Chat Bro What's On Your Mind? 
+        Let's Chat Bro What's On Your Mind?
       </p>
       <Button variant="primary" size="lg" onClick={onStartCall} className="mt-6 w-64 font-mono">
         {startButtonText}
