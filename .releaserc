@@ -1,0 +1,11 @@
+branches:
+  - main
+  - name: staging
+    prerelease: build
+
+plugins:
+  - "@semantic-release/commit-analyzer"
+  - "@semantic-release/release-notes-generator"
+  - "@semantic-release/gitlab"
+
+ci: true

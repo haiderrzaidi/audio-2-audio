@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Real-Time Audio Transcription</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        #messages { border: 1px solid #ccc; padding: 20px; height: 400px; overflow-y: auto; margin: 20px 0; }
+        .message { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .user { background: #e3f2fd; text-align: right; }
+        .bot { background: #f5f5f5; }
+        .system { background: #ffffcc; text-align: center; font-style: italic; } /* New system message style */
+        #status { color: #666; margin-bottom: 10px; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:disabled { background: #cccccc; }
+    </style>
+</head>
+<body>
+    <h1>Real-Time Audio Transcription</h1>
+    <div id="status">Click Start to begin</div>
+    <button id="startBtn" onclick="toggleRecording()">Start</button>
+    <div id="messages"></div>
+
+    <script>
+        let isRecording = false;
+        let websocket;
+        let audioContext;
+        let processor;
+
+        async function toggleRecording() {
+            if (!isRecording) {
+                try {
+                    await initWebSocket();
+                    await initAudio();
+                    isRecording = true;
+                    document.getElementById('startBtn').textContent = 'Stop';
+                    updateStatus('Recording...');
+                } catch (error) {
+                    console.error('Error starting recording:', error);
+                    updateStatus('Error starting recording');
+                }
+            } else {
+                stopRecording();
+                document.getElementById('startBtn').textContent = 'Start';
+                updateStatus('Ready to start');
+            }
+        }
+
+        async function initWebSocket() {
+            websocket = new WebSocket(`ws://localhost:8000/stt-tm-text-audios/ws`);
+            websocket.binaryType = 'arraybuffer';
+
+            websocket.onmessage = (event) => {
+                if (typeof event.data === 'string') {
+                    const message = event.data.trim();
+                    if (message === '[Speech Started]') {
+                        updateStatus('User is speaking...');
+                    } else if (message === '[Utterance Ended]') {
+                        addMessage('User paused for 2 seconds', 'system'); // New system message
+                        updateStatus('Ready');
+                    } else {
+                        addMessage(message, 'bot');
+                    }
+                }
+            };
+
+            websocket.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                updateStatus('Connection error');
+            };
+
+            websocket.onclose = () => {
+                console.log('WebSocket connection closed.');
+                updateStatus('Connection closed');
+            };
+        }
+
+        async function initAudio() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)({
+                sampleRate: 16000
+            });
+
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    sampleRate: 16000,
+                    channelCount: 1,
+                    noiseSuppression: true,
+                    echoCancellation: true
+                }
+            });
+
+            const source = audioContext.createMediaStreamSource(stream);
+            processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+            processor.onaudioprocess = (e) => {
+                if (!isRecording) return;
+                const input = e.inputBuffer.getChannelData(0);
+                const pcmData = convertAudioTo16BitPCM(input);
+                if (websocket.readyState === WebSocket.OPEN) {
+                    websocket.send(pcmData.buffer);
+                }
+            };
+
+            source.connect(processor);
+            processor.connect(audioContext.destination);
+        }
+
+        function convertAudioTo16BitPCM(input) {
+            const buffer = new Int16Array(input.length);
+            for (let i = 0; i < input.length; i++) {
+                const s = Math.max(-1, Math.min(1, input[i]));
+                buffer[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+            }
+            return buffer;
+        }
+
+        function addMessage(text, sender) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            messageDiv.textContent = text;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function updateStatus(text) {
+            document.getElementById('status').textContent = text;
+        }
+
+        function stopRecording() {
+            isRecording = false;
+            if (websocket) {
+                websocket.close();
+            }
+            if (processor) {
+                processor.disconnect();
+            }
+            if (audioContext) {
+                audioContext.close();
+            }
+        }
+
+        window.onbeforeunload = () => {
+            stopRecording();
+        };
+    </script>
+</body>
+</html>

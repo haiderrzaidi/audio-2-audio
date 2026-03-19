@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chatbot Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        .chat-container {
+            width: 400px;
+            height: 550px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+        }
+        #session-container {
+            display: flex;
+            padding: 10px;
+            border-bottom: 1px solid #ccc;
+        }
+        #session-id-input {
+            flex-grow: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        #chat-messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+        .message {
+            max-width: 80%;
+            padding: 8px 12px;
+            margin-bottom: 10px;
+            border-radius: 20px;
+            word-wrap: break-word;
+        }
+        .user-message {
+            align-self: flex-end;
+            background-color: #DCF8C6;
+        }
+        .assistant-message {
+            align-self: flex-start;
+            background-color: #E0E0E0;
+        }
+        #input-container {
+            display: flex;
+            padding: 10px;
+            border-top: 1px solid #ccc;
+        }
+        #user-input {
+            flex-grow: 1;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        button {
+            padding: 8px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div id="session-container">
+            <input type="text" id="session-id-input" placeholder="Enter Session ID">
+            <button onclick="setSessionId()">Set Session</button>
+        </div>
+        <div id="chat-messages"></div>
+        <div id="input-container">
+            <input type="text" id="user-input" placeholder="Type your message..." disabled>
+            <button onclick="sendMessage()" id="send-button" disabled>Send</button>
+        </div>
+    </div>
+
+    <script>
+        let sessionId = null;
+
+        function setSessionId() {
+            const sessionIdInput = document.getElementById('session-id-input');
+            sessionId = sessionIdInput.value.trim();
+            if (sessionId) {
+                document.getElementById('user-input').disabled = false;
+                document.getElementById('send-button').disabled = false;
+                appendMessage('System', `Session ID set to: ${sessionId}. You can now chat!`, 'assistant-message');
+            } else {
+                appendMessage('System', 'Please enter a valid Session ID.', 'assistant-message');
+            }
+        }
+
+        async function sendMessage() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const userInput = document.getElementById('user-input');
+            const message = userInput.value.trim();
+            if (!message || !sessionId) return;
+            userInput.value = '';
+            console.log(urlParams)
+            appendMessage('You', message, 'user-message');
+
+            try {
+                const response = await fetch(`/api/v1/tm-chat/chat/${sessionId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: message }),
+                });
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let assistantMessage = '';
+                const assistantElement = appendMessage('Assistant', '', 'assistant-message');
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            const data = line.slice(6);
+                            if (data === '[END]') {
+                                break;
+                            }
+                            assistantMessage += data;
+                            assistantElement.textContent = assistantMessage;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error sending message:', error);
+                appendMessage('System', 'Failed to send message. Please check your Session ID and try again.', 'assistant-message');
+            }
+        }
+
+        function appendMessage(sender, message, className) {
+            const chatMessages = document.getElementById('chat-messages');
+            const messageElement = document.createElement('div');
+            messageElement.textContent = `${sender}: ${message}`;
+            messageElement.className = `message ${className}`;
+            chatMessages.appendChild(messageElement);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            return messageElement;
+        }
+
+        // Add event listener for Enter key
+        document.getElementById('user-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Add event listener for Enter key on session ID input
+        document.getElementById('session-id-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                setSessionId();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+image: docker:24.0.5
+
+services:
+  - docker:24.0.5-dind
+
+variables:
+  DOCKER_HOST: tcp://docker:2375
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
+  GIT_SUBMODULE_STRATEGY: recursive
+  IMAGE_TAG: $CI_COMMIT_SHA
+  STAGING_ENV: ${{vars.STAGING_ENV}}
+  INFRA_REPO: "gitlab.com/centrox-data-products/ai/centrox-ai-ecs-infra.git" ## Please notice this -- remove https:// from path
+  INFRA_REPO_NAME: "centrox-ai-ecs-infra"
+
+  ## ADD following vars in CI/CD=> variables
+  
+  # ECS_DEPLOY_PASSWORD: $ECS_DEPLOY_PASSWORD
+  # ECS_DEPLOY_USERNAME: $ECS_DEPLOY_USERNAME
+
+
+stages:
+  - prerelease
+  - build
+  - deploy
+  - release
+
+prerelease:
+  stage: prerelease
+  image: node:21-slim
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends git-core ca-certificates bash curl python3-pip
+    - npm install -g @commitlint/cli@18.4.3 @commitlint/config-conventional@18.4.3 semantic-release @semantic-release/gitlab
+  script:
+    - echo "Validating commit message..."
+    - echo "${CI_COMMIT_MESSAGE}" | commitlint -x $(npm root -g)/@commitlint/config-conventional
+    
+    - echo "Running tests..."
+    # Add test commands here
+    
+    - echo "Running semantic release..."
+    - semantic_release_debug=$(semantic-release -d)
+    - BUILD_VERSION=$(echo "$semantic_release_debug" | grep -oP 'Published release \K.*? ')
+    - echo "BUILD VERSION=> '${BUILD_VERSION}'"
+    - echo "BUILD_VERSION=$BUILD_VERSION" >> build.env
+  artifacts:
+    reports:
+      dotenv: build.env
+    expire_in: 1 hour
+  only:
+    - main
+    - staging
+  tags:
+    - any
+
+build:
+  stage: build
+  image: docker:24.0.5-dind
+  needs: ["prerelease"]
+  before_script:
+    - docker info
+    - docker login $CI_REGISTRY -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD
+  script:
+    - echo "Received build version => '${BUILD_VERSION}'"
+    - tag="$CI_REGISTRY_IMAGE:${BUILD_VERSION}"
+    - docker pull $CI_REGISTRY_IMAGE:latest || true
+    - docker build --cache-from $CI_REGISTRY_IMAGE:latest --tag $tag --tag $CI_REGISTRY_IMAGE:latest .
+    - docker push $tag
+    - docker push $CI_REGISTRY_IMAGE:latest
+    - echo "Docker Image And Version => $CI_REGISTRY_IMAGE:${BUILD_VERSION}"
+  only:
+    - main
+    - staging
+  tags:
+    - any
+
+deploy:
+  stage: deploy
+  image: node:21-slim
+  needs: ["build", "prerelease"]
+  before_script:
+    - apt-get update && apt-get install -y --no-install-recommends git-core ca-certificates curl jq python3 python3-pip
+
+    - git config --global user.email "ci@centrox.io"
+    - git config --global user.name "GitLab CI"
+
+    - jq --arg image "$CI_REGISTRY_IMAGE:${BUILD_VERSION}" '.container_image = $image' deploy/ecs.json > deploy/ecs.json.tmp && mv deploy/ecs.json.tmp deploy/ecs.json
+    - cat deploy/ecs.json
+    
+    # Clone infra repo using deploy token
+    - git clone https://${ECS_DEPLOY_USERNAME}:${ECS_DEPLOY_PASSWORD}@${INFRA_REPO}
+    - cp deploy/ecs.json ${INFRA_REPO_NAME}
+    - cd ${INFRA_REPO_NAME}/
+    - GITLAB_USERNAME=$(sed -n 's/^registory_login *= *"\([^"]*\)".*$/\1/p' terraform/terraform.auto.tfvars)
+    - GITLAB_PAT=$(sed -n 's/^registory_password *= *"\([^"]*\)".*$/\1/p' terraform/terraform.auto.tfvars)
+
+  script:
+    - echo "Deploying with build version => '${BUILD_VERSION}'"
+
+    # Update ecs.json with container_image
+    - bash scripts/update_vars.sh
+    
+    # Commit and push changes
+    - git add terraform/terraform.auto.tfvars
+    - git commit -m "automated-release:Update terraform.auto.tfvars for $CI_REGISTRY_IMAGE version ${BUILD_VERSION}"
+    - git push https://${GITLAB_USERNAME}:${GITLAB_PAT}@${INFRA_REPO} HEAD:main
+    - echo "Updated infra repo with new container image"
+
+  only:
+    - main
+    - staging
+  tags:
+    - any
+
+release:
+  stage: release
+  image: node:21-slim
+  needs: ["deploy"]
+  before_script:
+    - echo "Received build version => '${BUILD_VERSION}'"
+    - apt-get update && apt-get install -y --no-install-recommends git-core ca-certificates curl
+    - npm install -g semantic-release @semantic-release/gitlab
+  script:
+    - semantic-release
+    - echo "Semantic Release done!!"
+  only:
+    - main
+    - staging
+  tags:
+    - any

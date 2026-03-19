@@ -1,0 +1,1 @@
+# thriving-minds-ai-core

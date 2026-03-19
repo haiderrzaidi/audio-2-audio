@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Audio Streaming with Chat History</title>
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+        <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+        <script src="https://cdn.tailwindcss.com"></script>
+        <style>
+        body {
+    font-family: 'Poppins', sans-serif;
+    color: #ADD8E6; /* Light blue font color */
+    background: linear-gradient(to bottom, #182158, #030414);
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+}            
+            img {
+    width: 50px; /* Adjust the size as needed */
+    height: auto;
+    display: block;
+    margin: 0 auto;
+}
+.recording {
+    background: linear-gradient(to bottom, rgba(139, 0, 0, 1), rgba(255, 69, 69, 1)) !important;
+    box-shadow: 0 0 20px rgba(255, 69, 69, 0.6) !important; /* Brighter red glow */
+    transform: scale(2.4); /* Slight scale up when recording */
+    position: relative;
+    border-radius: 50%; /* Circular shape if needed */
+}
+
+/* Wavy Outer Border Effect */
+.recording::before {
+    content: "";
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    right: -10px;
+    bottom: -10px;
+    background: linear-gradient(90deg, rgba(139, 0, 0, 0.8), rgba(255, 69, 69, 0.8));
+    border-radius: 50%;
+    z-index: -1;
+    animation: wavy-border 2s infinite linear;
+    filter: blur(10px); /* Soft glow effect */
+    opacity: 0.8;
+}
+
+/* Animation for the wavy effect */
+@keyframes wavy-border {
+    0% {
+        transform: scale(1);
+        opacity: 0.8;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 0.8;
+    }
+}
+
+
+        /* Logo Section */
+        .logo-container {
+    display: flex;
+    align-items: center;
+}
+
+.logo {
+    margin-right: 10px; /* Adjust as necessary */
+    width: 70px; /* Adjust the size of the image */
+    height: auto; /* Maintain aspect ratio */
+}
+
+.logo-text {
+    color: skyblue;
+    font-size: 202%; /* Slightly bigger than the default size */
+    font-weight: bold; /* Make the text bold */
+}
+        .chat-history-content {
+                scrollbar-width: thin;
+                scrollbar-color: rgba(255,255,255,0.3) rgba(255,255,255,0.1);
+            }
+
+            .chat-history-content::-webkit-scrollbar {
+                width: 8px;
+                background: rgba(255, 255, 255, 0.05);
+                border-radius: 4px;
+            }
+
+            .chat-history-content::-webkit-scrollbar-thumb {
+                background: linear-gradient(45deg, rgba(203,36,128,0.8), rgba(41,200,192,0.8));
+                border-radius: 4px;
+                border: 1px solid rgba(255,255,255,0.2);
+            }
+
+            .chat-history-content::-webkit-scrollbar-thumb:hover {
+                background: linear-gradient(45deg, rgba(203,36,128,1), rgba(41,200,192,1));
+            }
+
+/* Add this to your CSS file or <style> tag */
+    .close-button {
+    transition: transform 0.3s ease, opacity 0.3s ease;
+    transform: scale(1);
+    opacity: 0.75;
+}
+
+.close-button:hover {
+    transform: scale(1.1);
+    opacity: 1;
+}
+@keyframes fade-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes slide-up {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+    .animate-fade-in {
+      animation: fade-in 0.5s ease-out;
+    }
+    .animate-slide-up {
+      animation: slide-up 0.5s ease-out;
+    }
+        </style>
+    </head>
+    <body class="bg-gradient-to-br from-[#182158] to-[#030414] min-h-screen flex flex-col items-center">
+        <!-- Chat History Button with increased z-index -->
+        <button id="chatHistoryButton" class="fixed bottom-16 md:bottom-12 left-4 p-4 md:p-4 bg-white/10 backdrop-blur-sm rounded-full shadow-lg hover:bg-white/20 transition-all duration-300 z-[60]">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-white">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z"/>
+            </svg>
+        </button>
+    
+        <!-- Chat History Panel with highest z-index -->
+        <div id="chatHistoryPanel" class="fixed bottom-4 left-4 w-11/12 max-w-[650px] md:h-[70vh] h-[55vh] md:bottom-[120px] md:left-6 md:w-[650px] md:h-[60vh] bg-white/10 backdrop-blur-sm rounded-xl shadow-xl hidden scale-95 origin-bottom-left transition-all duration-300 overflow-hidden flex flex-col z-[100] mb-36 md:mb-0">
+            <div class="p-6 bg-gradient-to-r from-[#182158] to-[#030414] text-white flex justify-between items-center">
+                <h2 class="text-xl font-semibold">Chat History</h2>
+                <button id="closeChatPanel" class="close-button p-2 rounded-full hover:bg-white/20 transition-all duration-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 12h12" />
+                    </svg>
+                </button>
+            </div>
+            <div id="chatHistoryContent" class="flex-1 overflow-y-auto p-6 space-y-6 chat-history-content bg-[#182158]/20"></div>
+        </div>
+<!-- Combined Selectors Container -->
+<div class="fixed bottom-16 md:bottom-12 right-4 flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-4 z-[70]">
+    <!-- Model Selector -->
+    <div class="group relative">
+        <button id="modelSelector" class="p-4 md:p-4 bg-white/10 backdrop-blur-sm rounded-full shadow-lg hover:bg-white/20 transition-all duration-300 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-white">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18"/>
+            </svg>
+            <span class="selected-option text-white text-xs md:text-sm hidden md:block">OpenAI Model</span>
+        </button>
+        
+        <div class="absolute bottom-full right-0 mb-2 w-64 bg-white/10 backdrop-blur-sm rounded-xl shadow-xl transform scale-95 opacity-0 transition-all duration-200 pointer-events-none z-[80]">
+            <div class="p-4 space-y-2">
+                <button data-model="openai" class="model-option w-full text-left px-4 py-2 rounded-lg hover:bg-white/20 transition-all duration-300 text-white">OpenAI LLM</button>
+                <button data-model="qwen" class="model-option w-full text-left px-4 py-2 rounded-lg hover:bg-white/20 transition-all duration-300 text-white">Qwen LLM</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TTS Selector -->
+    <div class="group relative">
+        <button id="ttsSelector" class="p-4 md:p-4 bg-white/10 backdrop-blur-sm rounded-full shadow-lg hover:bg-white/20 transition-all duration-300 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-white">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75"/>
+            </svg>
+            <span class="selected-option text-white text-xs md:text-sm hidden md:block">OpenAI TTS</span>
+        </button>
+        <div class="absolute bottom-full right-0 mb-2 w-64 bg-white/10 backdrop-blur-sm rounded-xl shadow-xl transform scale-95 opacity-0 transition-all duration-200 pointer-events-none z-[80]">
+            <div class="p-4 space-y-2">
+                <button data-tts="openai" class="tts-option w-full text-left px-4 py-2 rounded-lg hover:bg-white/20 transition-all duration-300 text-white">OpenAI-TTS</button>
+                <button data-tts="gtts" class="tts-option w-full text-left px-4 py-2 rounded-lg hover:bg-white/20 transition-all duration-300 text-white">Google TTS</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+    <!-- Main Content -->
+    <div class="flex flex-col items-center justify-center mt-4 md:mt-8 px-4 z-30">
+        <img src="/public/images/favicon.png" alt="Logo" 
+        class="w-16 md:w-24 mb-2 md:mb-4">
+        <h1 class="text-3xl md:text-4xl text-center font-bold font-poppins text-sky-500">Audio 2 Audio</h1>
+    </div>
+
+
+    <p id="logs" class="text-center mt-4 md:mt-8 text-lg md:text-xl text-white font-poppins z-30 mb-4 md:mb-0">Press and hold to speak</p>
+    <canvas id="canvas" class="absolute top-1/2 -translate-y-1/2 w-full h-[300px] md:h-[400px] z-10"></canvas>
+        <!-- Main Recording Button -->
+    <button id="startButton" class="fixed bottom-12 left-1/2 -translate-x-1/2 w-24 h-24 md:w-20 md:h-20 bg-white/10 backdrop-blur-sm rounded-full shadow-lg bg-gradient-to-r from-[#182158] to-[#182158] transition-all duration-300 z-50"></button>
+
+    <script>
+
+// Add TTS Selection Logic
+let currentTTS = 'openai'; // Default selection
+const ttsSelector = document.getElementById('ttsSelector');
+const ttsDropdown = ttsSelector.nextElementSibling;
+const ttsOptions = document.querySelectorAll('.tts-option');
+
+// Initialize default TTS selection
+function initializeTTSSelection() {
+    ttsOptions.forEach(option => {
+        if (option.dataset.tts === currentTTS) {
+            option.classList.add('bg-blue-500/20');
+            // Update the selector button text to show current selection
+            const selectorText = ttsSelector.querySelector('.selected-option');
+            selectorText.textContent = option.textContent;
+        }
+    });
+}
+
+ttsOptions.forEach(option => {
+    option.addEventListener('click', () => {
+        currentTTS = option.dataset.tts;
+        ttsOptions.forEach(btn => btn.classList.remove('bg-blue-500/20'));
+        option.classList.add('bg-blue-500/20');
+        // Update the selector button text
+        const selectorText = ttsSelector.querySelector('.selected-option');
+        selectorText.textContent = option.textContent;
+        closeDropdown(ttsDropdown);
+    });
+});
+
+// Add Model Selection Logic
+let currentModel = 'openai'; // Default selection
+const modelSelector = document.getElementById('modelSelector');
+const modelDropdown = modelSelector.nextElementSibling;
+const modelOptions = document.querySelectorAll('.model-option');
+
+// Initialize default Model selection
+function initializeModelSelection() {
+    modelOptions.forEach(option => {
+        if (option.dataset.model === currentModel) {
+            option.classList.add('bg-blue-500/20');
+            // Update the selector button text to show current selection
+            const selectorText = modelSelector.querySelector('.selected-option');
+            selectorText.textContent = option.textContent;
+        }
+    });
+}
+
+modelOptions.forEach(option => {
+    option.addEventListener('click', () => {
+        currentModel = option.dataset.model;
+        modelOptions.forEach(btn => btn.classList.remove('bg-blue-500/20'));
+        option.classList.add('bg-blue-500/20');
+        // Update the selector button text
+        const selectorText = modelSelector.querySelector('.selected-option');
+        selectorText.textContent = option.textContent;
+        closeDropdown(modelDropdown);
+    });
+});
+
+// Dropdown management
+let activeDropdown = null;
+
+function toggleDropdown(dropdown) {
+    if (activeDropdown === dropdown) {
+        closeDropdown(dropdown);
+        activeDropdown = null;
+    } else {
+        if (activeDropdown) {
+            closeDropdown(activeDropdown);
+        }
+        openDropdown(dropdown);
+        activeDropdown = dropdown;
+    }
+}
+
+function openDropdown(dropdown) {
+    dropdown.classList.remove('scale-95', 'opacity-0', 'pointer-events-none');
+    dropdown.classList.add('scale-100', 'opacity-100', 'pointer-events-auto');
+}
+
+function closeDropdown(dropdown) {
+    dropdown.classList.remove('scale-100', 'opacity-100', 'pointer-events-auto');
+    dropdown.classList.add('scale-95', 'opacity-0', 'pointer-events-none');
+}
+
+// Click handlers for both selectors
+[modelSelector, ttsSelector].forEach(button => {
+    button.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const dropdown = button.nextElementSibling;
+        toggleDropdown(dropdown);
+    });
+});
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', () => {
+    if (activeDropdown) {
+        closeDropdown(activeDropdown);
+        activeDropdown = null;
+    }
+});
+
+// Prevent dropdown from closing when clicking inside
+[modelDropdown, ttsDropdown].forEach(dropdown => {
+    dropdown.addEventListener('click', (e) => {
+        e.stopPropagation();
+    });
+});
+
+// Initialize default selections when the page loads
+document.addEventListener('DOMContentLoaded', () => {
+    initializeTTSSelection();
+    initializeModelSelection();
+});        // Chat History Management
+        let chatHistory =  [];
+        let isChatHistoryVisible = false;
+
+        const chatHistoryButton = document.getElementById('chatHistoryButton');
+        const chatHistoryPanel = document.getElementById('chatHistoryPanel');
+        const chatHistoryContent = document.getElementById('chatHistoryContent');
+
+        // Toggle Chat History Panel
+        function toggleChatHistory() {
+            isChatHistoryVisible = !isChatHistoryVisible;
+            if (isChatHistoryVisible) {
+                chatHistoryPanel.classList.remove('hidden', 'scale-95');
+                chatHistoryPanel.classList.add('block', 'scale-100');
+                renderChatHistory();
+            } else {
+                chatHistoryPanel.classList.remove('block', 'scale-100');
+                chatHistoryPanel.classList.add('hidden', 'scale-95');
+            }
+        }
+
+        // Add Message to History
+        function addToHistory(content, isUser = true) {
+            const lastMessage = chatHistory[chatHistory.length - 1];
+            
+            if (!isUser && lastMessage && !lastMessage.isUser) {
+                // Append to existing bot message
+                lastMessage.text += ' ' + content;
+                lastMessage.timestamp = new Date().toLocaleTimeString();
+            } else {
+                // Add new message
+                chatHistory.push({
+                    text: content,
+                    isUser,
+                    timestamp: new Date().toLocaleTimeString()
+                });
+            }
+            
+            if (isChatHistoryVisible) renderChatHistory();
+        }
+        document.getElementById('closeChatPanel').addEventListener('click', toggleChatHistory);
+        chatHistoryButton.addEventListener('click', toggleChatHistory);
+        function renderChatHistory() {
+            chatHistoryContent.innerHTML = chatHistory.map(msg => `
+                <div class="${msg.isUser ? 'flex justify-end' : 'flex justify-start'} animate-fade-in-up">
+                    <div class="inline-block p-2 md:p-3 rounded-lg ${
+                        msg.isUser
+                        ? 'bg-gradient-to-br from-[#20378b] to-[#182158] text-white mr-2' 
+                        : 'bg-[#182158]/40 text-white ml-2'
+                    } max-w-[90%] md:max-w-[75%] shadow-md transition-transform duration-200 hover:scale-[1.02]">
+                        <p class="text-sm md:text-base mb-1 break-words">${msg.text}</p>
+                        <span class="text-xs md:text-sm opacity-75">${msg.timestamp}</span>
+                    </div>
+                </div>
+            `).join('');
+            chatHistoryContent.scrollTop = chatHistoryContent.scrollHeight;
+        }
+
+        // Audio and WebSocket Logic
+        const WIDTH = 1000;
+        const HEIGHT = 400;
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext("2d");
+        const logElement = document.getElementById('logs');
+        const startButton = document.getElementById('startButton');
+        let audioCtx;
+        let isRecognitionStopped = true;
+        let analyser;
+        let freqs;
+        let isRecording = false;
+        let audioQueue = [];
+        let isPlaying = false;
+        let currentSourceNode = null;
+        let ws;
+        let recognition;
+        let transcript = '';
+
+
+        let isProcessing = false;
+        let recordingTimeout = null;
+        let lastTranscript = '';
+        let currentTranscript = '';
+        let finalTranscript = '';
+        let recognitionComplete = false;
+
+        // Visualization options
+        const opts = {
+            smoothing: 0.6,
+            fft: 8,
+            minDecibels: -70,
+            scale: 0.2,
+            glow: 10,
+            color1: [203, 36, 128],
+            color2: [41, 200, 192],
+            color3: [24, 137, 218],
+            fillOpacity: 0.6,
+            lineWidth: 1,
+            blend: "screen",
+            shift: 50,
+            width: 60,
+            amp: 1
+        };
+
+        // Setup push-to-talk events
+        startButton.addEventListener('mousedown', startRecording);
+        startButton.addEventListener('mouseup', stopRecording);
+        startButton.addEventListener('mouseleave', stopRecording);
+        startButton.addEventListener('touchstart', startRecording);
+        startButton.addEventListener('touchend', stopRecording);
+
+        function setupAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
+                analyser = audioCtx.createAnalyser();
+                freqs = new Uint8Array(analyser.frequencyBinCount);
+                setupWebSocket();
+                setupRecognition();
+                visualize();
+            }
+        }
+
+
+
+        
+        
+        function setupWebSocket() {
+            // ws = new WebSocket('ws://localhost:8000/tm-text-audio/ws_stream_response');
+
+            ws = new WebSocket('wss://a2a.api.centrox.ai/tm-text-audio/ws_stream_response');
+            
+            ws.onopen = () => {
+                console.log('WebSocket connection opened');
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket closed');
+                setTimeout(setupWebSocket, 3000); // Attempt to reconnect
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+            }; 
+               ws.onmessage = async (event) => {
+                console.log('Message received:', event.data);
+                try {
+                    if (typeof event.data === 'string') {
+                        const message = JSON.parse(event.data);
+                        if (message.type === 'audio') {
+                            // Add the actual response text to history
+                            if (message.text && message.text !== 'Stream-End') {
+                                addToHistory(message.text, false);
+                            }
+                            
+                            if (message.audio) {
+                                const audioData = Uint8Array.from(atob(message.audio), c => c.charCodeAt(0));
+                                const audioBuffer = await audioCtx.decodeAudioData(audioData.buffer);
+                                audioQueue.push(audioBuffer);
+                                if (!isPlaying) playNextInQueue();
+                            }
+                        }
+                    } else {
+                        const arrayBuffer = await event.data.arrayBuffer();
+                        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                        audioQueue.push(audioBuffer);
+                        if (!isPlaying) playNextInQueue();
+                    }
+                } catch (error) {
+                    console.error('Error processing message:', error);
+                }
+            };
+            ws.onclose = () => console.log('WebSocket closed');
+        }
+
+// Improved recognition setup
+function setupRecognition() {
+    if (recognition) {
+        recognition.stop();
+        recognition = null;
+    }
+
+    recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+    
+    recognition.onstart = () => {
+        console.log('Recognition started');
+        isRecognitionStopped = false;
+        // Reset transcripts when starting new recognition
+        currentTranscript = '';
+        finalTranscript = '';
+        recognitionComplete = false;
+    };
+
+    recognition.onresult = (event) => {
+        currentTranscript = '';
+        let interimTranscript = '';
+        
+        // Process results
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+            const result = event.results[i];
+            if (result.isFinal) {
+                finalTranscript += result[0].transcript;
+            } else {
+                interimTranscript += result[0].transcript;
+            }
+        }
+
+        // Update current transcript
+        currentTranscript = finalTranscript + interimTranscript;
+        
+        // Update UI
+        if (interimTranscript) {
+            logElement.innerText = 'Listening: ' + currentTranscript;
+        } else {
+            logElement.innerText = currentTranscript;
+        }
+    };
+
+    recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+        if (event.error === 'no-speech') {
+            logElement.innerText = 'No speech detected. Please try again.';
+        }
+        recognitionComplete = true;
+        stopRecording({ preventDefault: () => {} });
+    };
+
+    recognition.onend = () => {
+        console.log('Recognition ended');
+        isRecognitionStopped = true;
+        recognitionComplete = true;
+
+        // Only process if we have a final transcript
+        if (finalTranscript.trim()) {
+            processRecognitionResult();
+        } else {
+            logElement.innerText = 'No speech detected. Please try again.';
+            isRecording = false;
+            startButton.classList.remove('recording');
+        }
+    };
+}
+function processRecognitionResult() {
+    if (finalTranscript.trim() && recognitionComplete) {
+        isProcessing = true;
+        addToHistory(finalTranscript.trim(), true);
+        logElement.innerText = 'Processing...';
+        
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: "text",
+                data: finalTranscript.trim(),
+                tts: currentTTS,
+                model: currentModel
+            }));
+        } else {
+            console.error('WebSocket not connected');
+            logElement.innerText = 'Connection error. Please try again.';
+            isProcessing = false;
+        }
+        
+        // Reset transcripts after processing
+        finalTranscript = '';
+        currentTranscript = '';
+    }
+}
+function startRecording(e) {
+    e.preventDefault();
+    
+    if (isPlaying || isProcessing) {
+        logElement.innerText = 'Please wait for the current process to complete';
+        return;
+    }
+
+    setupAudio();
+    
+    if (!isRecording) {
+        try {
+            setupRecognition(); // Reset recognition instance
+            recognition.start();
+            isRecording = true;
+            startButton.classList.add('recording');
+            logElement.innerText = 'Listening...';
+            transcript = '';
+            
+            // Set a maximum recording time (e.g., 30 seconds)
+            recordingTimeout = setTimeout(() => {
+                if (isRecording) {
+                    stopRecording({ preventDefault: () => {} });
+                }
+            }, 30000);
+        } catch (err) {
+            console.error('Error starting recognition:', err);
+            isRecording = false;
+            startButton.classList.remove('recording');
+            logElement.innerText = 'Error starting recording. Please try again.';
+        }
+    }
+}
+
+
+// Improved recording stop function
+function stopRecording(e) {
+    e.preventDefault();
+    
+    if (recordingTimeout) {
+        clearTimeout(recordingTimeout);
+        recordingTimeout = null;
+    }
+
+    if (isRecording) {
+        isRecording = false;
+        startButton.classList.remove('recording');
+        
+        try {
+            recognition.stop();
+        } catch (err) {
+            console.error('Error stopping recognition:', err);
+        }
+
+        // Use the last valid transcript if available
+        const finalTranscript = lastTranscript || transcript;
+        
+        if (finalTranscript.trim()) {
+            isProcessing = true;
+            addToHistory(finalTranscript.trim(), true);
+            logElement.innerText = 'Processing...';
+            
+            // Ensure WebSocket is connected before sending
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: "text",
+                    data: finalTranscript.trim(),
+                    tts: currentTTS,
+                    model: currentModel
+                }));
+            } else {
+                console.error('WebSocket not connected');
+                logElement.innerText = 'Connection error. Please try again.';
+                isProcessing = false;
+            }
+        } else {
+            logElement.innerText = 'Press and hold to speak';
+        }
+    }
+}
+
+// Improved audio playback function
+function playNextInQueue() {
+    if (audioQueue.length === 0 || isPlaying) return;
+    
+    isPlaying = true;
+    isProcessing = false; // Reset processing state
+    logElement.innerText = 'Playing response...';
+    
+    try {
+        const audioBuffer = audioQueue.shift();
+        currentSourceNode = audioCtx.createBufferSource();
+        currentSourceNode.buffer = audioBuffer;
+        currentSourceNode.connect(analyser);
+        currentSourceNode.connect(audioCtx.destination);
+        
+        currentSourceNode.onended = () => {
+            isPlaying = false;
+            if (audioQueue.length > 0) {
+                setTimeout(() => playNextInQueue(), 100); // Small delay between audio chunks
+            } else {
+                logElement.innerText = 'Press and hold to speak';
+            }
+        };
+        
+        currentSourceNode.start();
+    } catch (err) {
+        console.error('Error playing audio:', err);
+        isPlaying = false;
+        logElement.innerText = 'Error playing audio. Please try again.';
+    }
+}
+        // Visualization functions
+        function visualize() {
+            analyser.smoothingTimeConstant = opts.smoothing;
+            analyser.fftSize = Math.pow(2, opts.fft);
+            analyser.minDecibels = opts.minDecibels;
+            analyser.maxDecibels = 0;
+            analyser.getByteFrequencyData(freqs);
+            
+            canvas.width = WIDTH;
+            canvas.height = HEIGHT;
+            
+            path(0);
+            path(1);
+            path(2);
+            
+            requestAnimationFrame(visualize);
+        }
+
+        function range(i) {
+            return Array.from(Array(i).keys());
+        }
+
+        const shuffle = [1, 3, 0, 4, 2];
+
+        function freq(channel, i) {
+            const band = 2 + channel + shuffle[i] * 6;
+            return freqs[band];
+        }
+
+        function scale(i) {
+            const x = Math.abs(2 - i);
+            const s = 3 - x;
+            return s / 3 * opts.amp;
+        }
+
+        function path(channel) {
+            const color = opts[`color${channel + 1}`].map(Math.floor);
+            ctx.fillStyle = `rgba(${color}, ${opts.fillOpacity})`;
+            ctx.strokeStyle = ctx.shadowColor = `rgb(${color})`;
+            ctx.lineWidth = opts.lineWidth;
+            ctx.shadowBlur = opts.glow;
+            ctx.globalCompositeOperation = opts.blend;
+
+            const m = HEIGHT / 2;
+            const offset = (WIDTH - 15 * opts.width) / 2;
+            const x = range(15).map(i => offset + channel * opts.shift + i * opts.width);
+            const y = range(5).map(i => Math.max(0, m - scale(i) * freq(channel, i)));
+            const h = 2 * m;
+
+            ctx.beginPath();
+            ctx.moveTo(0, m);
+            ctx.lineTo(x[0], m + 1);
+            ctx.bezierCurveTo(x[1], m + 1, x[2], y[0], x[3], y[0]);
+            ctx.bezierCurveTo(x[4], y[0], x[4], y[1], x[5], y[1]);
+            ctx.bezierCurveTo(x[6], y[1], x[6], y[2], x[7], y[2]);
+            ctx.bezierCurveTo(x[8], y[2], x[8], y[3], x[9], y[3]);
+            ctx.bezierCurveTo(x[10], y[3], x[10], y[4], x[11], y[4]);
+            ctx.bezierCurveTo(x[12], y[4], x[12], m, x[13], m);
+            ctx.lineTo(WIDTH, m + 1);
+            ctx.lineTo(x[13], m - 1);
+            ctx.bezierCurveTo(x[12], m, x[12], h - y[4], x[11], h - y[4]);
+            ctx.bezierCurveTo(x[10], h - y[4], x[10], h - y[3], x[9], h - y[3]);
+            ctx.bezierCurveTo(x[8], h - y[3], x[8], h - y[2], x[7], h - y[2]);
+            ctx.bezierCurveTo(x[6], h - y[2], x[6], h - y[1], x[5], h - y[1]);
+            ctx.bezierCurveTo(x[4], h - y[1], x[4], h - y[0], x[3], h - y[0]);
+            ctx.bezierCurveTo(x[2], h - y[0], x[1], m, x[0], m);
+            ctx.lineTo(0, m);
+            ctx.fill();
+            ctx.stroke();
+        }
+    </script>
+</body>
+</html>

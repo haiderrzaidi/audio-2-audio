@@ -1,0 +1,166 @@
+<!-- frontend/index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Audio Chat</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        #messages { border: 1px solid #ccc; padding: 20px; height: 400px; overflow-y: auto; margin: 20px 0; }
+        .message { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .user { background: #e3f2fd; text-align: right; }
+        .bot { background: #f5f5f5; }
+        #status { color: #666; margin-bottom: 10px; }
+        button { padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:disabled { background: #cccccc; }
+    </style>
+</head>
+<body>
+    <h1>Audio Chat</h1>
+    <div id="status">Click Start to begin</div>
+    <button id="startBtn" onclick="toggleRecording()">Start</button>
+    <div id="messages"></div>
+
+    <script>
+        let isRecording = false;
+        let websocket;
+        let audioContext;
+        let audioQueue = [];
+        let isPlaying = false;
+
+        async function toggleRecording() {
+            if (!isRecording) {
+                try {
+                    await initWebSocket();
+                    await initAudio();
+                    isRecording = true;
+                    document.getElementById('startBtn').textContent = 'Stop';
+                    updateStatus('Recording...');
+                } catch (error) {
+                    console.error('Error starting recording:', error);
+                    updateStatus('Error starting recording');
+                }
+            } else {
+                stopRecording();
+                document.getElementById('startBtn').textContent = 'Start';
+                updateStatus('Ready to start');
+            }
+        }
+
+        async function initWebSocket() {
+    websocket = new WebSocket(`wss://a2a.ws.centrox.io/stt-tm-text-audio/ws`);
+    // websocket = new WebSocket(`ws://localhost:8000/stt-tm-text-audio/ws`)
+    websocket.binaryType = 'arraybuffer';  // Crucial for binary handling
+    
+    websocket.onmessage = (event) => {
+        if (typeof event.data === 'string') {
+            const data = JSON.parse(event.data);
+            if (data.type === 'user_text') {
+                addMessage(data.text, 'user');
+            } else if (data.type === 'audio') {
+                addMessage(data.text, 'bot');
+                queueAudio(data.audio);
+            }
+        }
+    };
+
+    websocket.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        updateStatus('Connection error');
+    };
+}
+
+async function initAudio() {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)({
+        sampleRate: 16000
+    });
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+            sampleRate: 16000,
+            channelCount: 1,
+            noiseSuppression: true,
+            echoCancellation: true
+        }
+    });
+
+    const source = audioContext.createMediaStreamSource(stream);
+    const processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+    processor.onaudioprocess = (e) => {
+        if (!isRecording) return;
+        const input = e.inputBuffer.getChannelData(0);
+        const pcm = convertAudioTo16BitPCM(input);
+        
+        // Send as ArrayBuffer
+        if (websocket.readyState === WebSocket.OPEN) {
+            websocket.send(pcm.buffer);  // Send the underlying ArrayBuffer
+        }
+    };
+
+    source.connect(processor);
+    processor.connect(audioContext.destination);
+}
+
+// Update audio conversion function
+function convertAudioTo16BitPCM(input) {
+    const buffer = new Int16Array(input.length);
+    for (let i = 0; i < input.length; i++) {
+        const s = Math.max(-1, Math.min(1, input[i]));
+        buffer[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+    return buffer;
+}
+
+
+        function queueAudio(base64Data) {
+            audioQueue.push(base64Data);
+            if (!isPlaying) playNextAudio();
+        }
+
+        async function playNextAudio() {
+            if (audioQueue.length === 0) {
+                isPlaying = false;
+                return;
+            }
+
+            isPlaying = true;
+            const audioData = audioQueue.shift();
+            const byteString = atob(audioData);
+            const arrayBuffer = new Uint8Array(byteString.length);
+            for (let i = 0; i < byteString.length; i++) {
+                arrayBuffer[i] = byteString.charCodeAt(i);
+            }
+
+            const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+            const url = URL.createObjectURL(blob);
+            const audio = new Audio(url);
+            
+            audio.onended = () => playNextAudio();
+            audio.play().catch(error => console.error('Audio play error:', error));
+        }
+
+        function addMessage(text, sender) {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            messageDiv.textContent = text;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+
+        function updateStatus(text) {
+            document.getElementById('status').textContent = text;
+        }
+
+        function stopRecording() {
+            isRecording = false;
+            if (websocket) websocket.close();
+            if (audioContext) audioContext.close();
+        }
+
+        window.onbeforeunload = () => {
+            stopRecording();
+        };
+    </script>
+</body>
+</html>
